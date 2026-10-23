@@ -1,0 +1,155 @@
+```{r}
+library(fpp2)
+
+TOTALNSA <- read.csv("TOTALNSA.csv")
+
+TOTALNSA_ts <- ts(TOTALNSA$TOTALNSA,
+                  start = c(1976, 1),
+                  frequency = 12)
+
+attributes(TOTALNSA_ts)
+plot(TOTALNSA_ts)
+Acf(TOTALNSA_ts)
+
+```
+
+```{r}
+# Take the mean of all available history
+mean_forecast <- meanf(TOTALNSA_ts, 5)
+plot(mean_forecast)
+# The mean forecast predicts future sales using the average of all historical observations.
+```
+```{r}
+# Naive
+naive_forecast <- naive(TOTALNSA_ts, 5)
+plot(naive_forecast)
+# The naive forecast assumes sales over the next five months will remain at the most recent observed value.
+```
+```{r}
+# Random Walk
+rwf_forecast <- rwf(TOTALNSA_ts, 5)
+rwf_forecast <- rwf(TOTALNSA_ts, 5, drift=TRUE)
+plot(rwf_forecast)
+# This method uses the latest sales value and the average historical change to predict future sales.
+```
+```{r}
+# Seasonal Naive
+snaive_forecast <- snaive(TOTALNSA_ts, 5)
+plot(snaive_forecast)
+# The seasonal naive method predicts sales using the same month from the previous year, which is useful for data that has seasonal patterns.
+```
+```{r}
+# Moving Averages
+MA5_forecast <- ma(TOTALNSA_ts, order=5)
+MA9_forecast <- ma(TOTALNSA_ts, order=9)
+
+plot(TOTALNSA_ts)
+lines(MA5_forecast, col="pink")
+lines(MA9_forecast, col="blue")
+# Moving averages smooth short-term fluctuations. The 9-month average is generally smoother than the 5-month average.
+```
+```{r}
+# Plot all models in a single chart
+plot(mean_forecast)
+lines(naive_forecast$mean, col="red")
+lines(rwf_forecast$mean, col="green")
+lines(snaive_forecast$mean, col="black")
+lines(MA5_forecast, col="pink")
+lines(MA9_forecast, col="blue")
+# This chart displays the forecast predictions together. Moving averages mainly smooth historical data and are not forecasts of future sales in this example.
+```
+
+```{r}
+# What other attributes are there?
+attributes(naive_forecast)
+# The attributes show information stored in the forecast object, including predicted values and prediction intervals.
+```
+```{r}
+# ETS model
+ets_forecast <- ets(TOTALNSA_ts)
+plot(ets_forecast)
+attributes(ets_forecast)
+ets_forecast$mse
+# ETS automatically selects an exponential smoothing model. Its mean squared error (MSE) helps measure how closely the fitted values match historical data.
+```
+```{r}
+# Holt-Winters
+HW_forecast <- HoltWinters(TOTALNSA_ts)
+plot(HW_forecast)
+#The Holt-Winters method uses exponential smoothing to model patterns in time-series data.
+```
+```{r}
+SSE_Simple <- HoltWinters(
+  TOTALNSA_ts,
+  beta=FALSE,
+  gamma=FALSE
+)
+
+attributes(SSE_Simple)
+plot(SSE_Simple)
+SSE_Simple$SSE
+head(SSE_Simple$fitted)
+# Setting beta = FALSE and gamma = FALSE disables trend and seasonal smoothing. SSE measures the total squared difference between actual and fitted values.
+```
+```{r}
+# Forecast
+forecast_ets_1 <- forecast.ets(ets_forecast, h=5)
+plot(forecast_ets_1)
+
+forecast_ets_2 <- forecast(ets_forecast, h=5)
+plot(forecast_ets_2)
+# These commands forecast vehicle sales for the next five months using the fitted ETS model.
+```
+
+
+
+
+```{r}
+# Split data into training and testing sets
+n <- length(TOTALNSA_ts)
+
+train <- head(TOTALNSA_ts, n - 5)
+test <- tail(TOTALNSA_ts, 5)
+
+# Fit forecasting models using training data
+mean_test <- meanf(train, h=5)
+naive_test <- naive(train, h=5)
+rwf_test <- rwf(train, h=5, drift=TRUE)
+snaive_test <- snaive(train, h=5)
+
+ets_test_model <- ets(train)
+ets_test <- forecast(ets_test_model, h=5)
+
+HW_test_model <- HoltWinters(train)
+HW_test <- forecast(HW_test_model, h=5)
+
+# Compare test-set accuracy
+rmse_results <- data.frame(
+  Model = c(
+    "Mean",
+    "Naive",
+    "Random Walk with Drift",
+    "Seasonal Naive",
+    "ETS",
+    "Holt-Winters"
+  ),
+  RMSE = c(
+    accuracy(mean_test, test)["Test set", "RMSE"],
+    accuracy(naive_test, test)["Test set", "RMSE"],
+    accuracy(rwf_test, test)["Test set", "RMSE"],
+    accuracy(snaive_test, test)["Test set", "RMSE"],
+    accuracy(ets_test, test)["Test set", "RMSE"],
+    accuracy(HW_test, test)["Test set", "RMSE"]
+  )
+)
+
+rmse_results <- rmse_results[
+  order(rmse_results$RMSE),
+]
+
+print(rmse_results)
+
+# The Holt-Winters model performed the best, with the lowest RMSE of 46.24, followed by ETS at 47.27, Naive at 55.15, Random Walk with Drift at 56.24, Seasonal Naive at 69.01, and Mean at 166.17.
+
+# Therefore, Holt-Winters is the best forecasting model for this dataset because it produced the lowest RMSE, meaning its predictions were closest to the actual vehicle sales during the five-month test period.
+```
